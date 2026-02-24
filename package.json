@@ -1,32 +1,21 @@
 {
   "name": "android-remote-cli",
   "version": "1.0.0",
+  "description": "",
   "main": "index.js",
-  "bin": {
-    "android-remote-cli": "index.js"
-  },
+  "bin": "index.js",
   "scripts": {
-    "dev": "node index.js",
-    "build": "pkg ."
+    "start": "node index.js",
+    "build": "pkg . --output dist/android-remote-tool.exe"
   },
-  "keywords": [
-    "scrcpy",
-    "adb",
-    "android",
-    "cli",
-    "automation",
-    "installer",
-    "windows"
-  ],
-  "author": "zhouzhijun",
+  "keywords": [],
+  "author": "",
   "license": "ISC",
+  "type": "commonjs",
   "dependencies": {
-    "adm-zip": "0.5.10",
-    "chalk": "4.1.2",
-    "fs-extra": "^10.1.0",
-    "inquirer": "8.2.6",
-    "node-fetch": "^2.6.7",
-    "ora": "5.4.1"
+    "adm-zip": "^0.5.16",
+    "axios": "^1.13.5",
+    "inquirer": "^8.2.6"
   },
   "devDependencies": {
     "pkg": "^5.8.1"
