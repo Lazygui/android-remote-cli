@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const packageJson = require('./package.json');
-const EXE_NAME = 'Android-Remote.exe';
+const EXE_NAME = 'android-remote-cli.exe';
 const ICON_PATH = 'app.ico';
 const DIST_PATH = 'dist';
 const EXE_PATH = path.join(DIST_PATH, EXE_NAME);

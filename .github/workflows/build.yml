@@ -20,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 2. 提取 Release Notes (改用更稳健的逐行扫描算法)
+      # 2. 提取 Release Notes (修复标题级别匹配问题)
       - name: Extract Release Notes
         id: extract_notes
         uses: actions/github-script@v7
@@ -35,28 +35,34 @@ jobs:
             }
 
             const changelog = fs.readFileSync(path, 'utf8');
-            const tag = context.ref.replace('refs/tags/', ''); // 例如 v1.0.0
-            const tagWithoutV = tag.replace(/^v/, '');       // 例如 1.0.0
+            const tag = context.ref.replace('refs/tags/', ''); 
+            const tagWithoutV = tag.replace(/^v/, '');       
             
             console.log(`Target Tag: ${tag}`);
             
-            // 将文件按行切分，兼容 Windows(\r\n) 和 Linux(\n)
             const lines = changelog.split(/\r?\n/);
             let releaseNotes = [];
             let startCollecting = false;
 
             for (const line of lines) {
-              // 检查是否是二级标题行 (##)
-              if (line.trim().startsWith('##')) {
+              const trimmed = line.trim();
+              
+              // 【关键修复】：仅匹配二级标题 (## )，不匹配三级标题 (###)
+              // 正则含义：以两个#开头，后面必须跟一个空格
+              const isVersionHeader = /^##\s/.test(trimmed);
+
+              if (isVersionHeader) {
                 if (startCollecting) {
-                  // 如果已经在收集内容，遇到下一个标题就停止
+                  // 如果已经在收集，遇到下一个“二级标题”才停止
+                  console.log(`Found next version header: ${line}, stopping.`);
                   break;
                 }
-                // 检查标题行是否包含 v1.0.0 或 1.0.0
-                if (line.includes(tag) || line.includes(tagWithoutV)) {
-                  console.log(`Found header: ${line}`);
+                
+                // 检查当前二级标题是否包含目标版本号
+                if (trimmed.includes(tag) || trimmed.includes(tagWithoutV)) {
+                  console.log(`✅ Matched header: ${line}`);
                   startCollecting = true;
-                  continue; // 跳过标题行本身
+                  continue; 
                 }
               }
 
@@ -68,11 +74,10 @@ jobs:
             const finalNotes = releaseNotes.join('\n').trim();
             
             if (finalNotes) {
-              console.log('Successfully extracted notes.');
+              console.log('Successfully extracted content.');
               core.setOutput('notes', finalNotes);
             } else {
-              console.log('Failed to find matching section.');
-              // 备选方案：如果没找到，就返回一个默认的通知
+              console.log('❌ Content is empty after matching header.');
               core.setOutput('notes', `Android Remote CLI ${tag} 发布，详情请查看 CHANGELOG.md。`);
             }
 
@@ -83,7 +88,7 @@ jobs:
           node-version: 18
           cache: 'npm'
 
-      # 4. 安装依赖并执行构建脚本
+      # 4. 安装并构建
       - name: Install and Build
         run: |
           npm ci
