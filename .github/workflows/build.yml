@@ -51,10 +51,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          # 自动生成 Release 标题和内容
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          generate_release_notes: true # 自动根据 commit 生成更新日志
+          body_path: RELEASE_NOTES.md
           
           # 上传 dist 目录下的 exe 文件
           files: |
