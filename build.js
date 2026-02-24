@@ -1,11 +1,9 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { NtExecutable, NtExecutableResource, Resource, Data } = require('resedit');
-
 
 const packageJson = require('./package.json');
-const EXE_NAME = 'android-remote-cli.exe';
+const EXE_NAME = 'Android-Remote.exe';
 const ICON_PATH = 'app.ico';
 const DIST_PATH = 'dist';
 const EXE_PATH = path.join(DIST_PATH, EXE_NAME);
@@ -15,50 +13,53 @@ async function build() {
        console.log('🚀 开始构建流程');
        console.log('------------------------------------------------');
 
+       // 【关键修复点】在这里动态导入 resedit
+       // 因为 resedit 是 ESM 模块，在 CommonJS 中必须这样导入
+       const { NtExecutable, NtExecutableResource, Resource, Data } = await import('resedit');
+
+       // 1. 准备目录
        if (!fs.existsSync(DIST_PATH)) fs.mkdirSync(DIST_PATH);
 
-       console.log(`[1/3] 正在使用 pkg 打包...`);
+       // 2. 执行 pkg 打包
+       console.log(`[1/3] 正在使用 pkg 打包到 ${EXE_PATH} ...`);
        try {
               execSync(`npx pkg . --targets node18-win-x64 --output ${EXE_PATH}`, { stdio: 'inherit' });
        } catch (error) {
+              console.error('❌ pkg 打包失败');
               process.exit(1);
        }
 
+       // 3. 注入资源
        console.log('[2/3] 正在解析并注入资源...');
+
+       if (!fs.existsSync(EXE_PATH)) {
+              console.error('❌ 未找到生成的 EXE 文件，终止。');
+              process.exit(1);
+       }
 
        const buffer = fs.readFileSync(EXE_PATH);
        const executable = NtExecutable.from(buffer);
        const res = NtExecutableResource.from(executable);
 
-       // --- A. 智能注入图标 (修复图标不显示的问题) ---
+       // --- A. 注入图标 ---
        if (fs.existsSync(ICON_PATH)) {
-              console.log('  -> 正在读取新图标...');
+              console.log('  -> 正在注入图标...');
               const iconData = fs.readFileSync(ICON_PATH);
               const iconFile = Data.IconFile.from(iconData);
 
-              // 1. 查找现有的图标 ID
-              // RT_GROUP_ICON 的类型 ID 是 14
+              // 自动查找现有图标 ID 并替换
               const existingIconGroups = res.entries.filter(entry => entry.type === 14);
+              let targetIconID = existingIconGroups.length > 0 ? existingIconGroups[0].id : 1;
 
-              let targetIconID = 1; // 默认标准 Windows 图标 ID
-
-              if (existingIconGroups.length > 0) {
-                     // 如果找到了现有图标，就替换它 (通常是 ID 1)
-                     targetIconID = existingIconGroups[0].id;
-                     console.log(`  -> 发现现有图标 ID: ${targetIconID}，将执行替换。`);
-              } else {
-                     console.log(`  -> 未发现现有图标，将使用默认 ID: ${targetIconID} 进行添加。`);
-              }
+              console.log(`  -> 目标图标 ID: ${targetIconID}`);
 
               const iconBuffers = iconFile.icons.map(item => item.data);
-
               Resource.IconGroupEntry.replaceIconsForResource(
                      res.entries,
-                     targetIconID, // 使用自动检测到的 ID
+                     targetIconID,
                      1033,
                      iconBuffers
               );
-              console.log('  -> 图标注入完成。');
        } else {
               console.warn(`  -> ⚠️ 未找到 ${ICON_PATH}`);
        }
@@ -91,12 +92,17 @@ async function build() {
        // 4. 保存文件
        console.log('[3/3] 正在生成最终文件...');
        res.outputResource(executable);
+
        const newBinary = executable.generate();
+       // 将 ArrayBuffer 转回 Buffer
        fs.writeFileSync(EXE_PATH, Buffer.from(newBinary));
 
        console.log('------------------------------------------------');
-       console.log(`✅ 构建成功！\n⚠️ 注意: 如果图标没变，请将文件重命名或移动到其他文件夹以清除 Windows 缓存。`);
+       console.log(`✅ 构建成功！文件位于: ${EXE_PATH}`);
        console.log('------------------------------------------------');
 }
 
-build().catch(console.error);
+build().catch(err => {
+       console.error('❌ 构建错误:', err);
+       process.exit(1);
+});
