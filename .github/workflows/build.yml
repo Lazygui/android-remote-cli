@@ -20,15 +20,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 2. [核心步骤] 从 CHANGELOG.md 中提取当前版本的说明
-      - name: Get notes from Changelog
-        id: generate_notes
-        uses: anmarkoulis/commitizen-changelog-reader@master
+      # 2. [核心替代步骤] 使用 Node.js 脚本提取 Changelog 内容
+      - name: Extract Release Notes
+        id: extract_notes
+        uses: actions/github-script@v7
         with:
-          tag_name: ${{ github.ref }}
-          changelog: CHANGELOG.md
+          script: |
+            const fs = require('fs');
+            const path = 'CHANGELOG.md';
+            if (!fs.existsSync(path)) {
+              core.setOutput('notes', 'No CHANGELOG.md found.');
+              return;
+            }
+            const changelog = fs.readFileSync(path, 'utf8');
+            const tag = context.ref.replace('refs/tags/', '');
+            
+            // 匹配 ## v1.0.0 或 ## [v1.0.0] 及其之后的内容，直到下一个 ## 或文件结束
+            // 这个正则兼容性很强，能自动识别你的版本号段落
+            const regex = new RegExp(`## \\[?${tag.replace('.', '\\.')}\\]?[\\s\\S]*?(?=\\n## |\\z)`);
+            const result = changelog.match(regex);
+            
+            if (result) {
+              // 提取内容并去掉第一行的标题
+              const lines = result[0].split('\n');
+              const notes = lines.slice(1).join('\n').trim();
+              core.setOutput('notes', notes);
+            } else {
+              core.setOutput('notes', `Release notes for ${tag} not found in CHANGELOG.md`);
+            }
 
-      # 3. 设置 Node 环境并构建项目
+      # 3. 设置 Node 环境并构建
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -48,8 +69,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Android Remote CLI ${{ github.ref_name }}
-          # 【关键点】该插件返回的是 JSON 格式，需要用 join 函数转回字符串
-          body: ${{ join(fromJson(steps.generate_notes.outputs.notes).notes, '') }}
+          # 使用上面脚本提取出的内容
+          body: ${{ steps.extract_notes.outputs.notes }}
           files: |
             dist/*.exe
           draft: false
