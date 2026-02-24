@@ -3,10 +3,10 @@ name: Build and Release Android Remote (Windows)
 on:
   push:
     tags:
-      - 'v*'  # 当推送 v 开头的 tag 时触发，例如 v1.0.0
+      - 'v*'
 
 permissions:
-  contents: write # 授予发布 Release 的权限
+  contents: write
 
 jobs:
   build-and-release:
@@ -14,48 +14,43 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 1. 拉取代码
+      # 1. 检出代码
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. 设置 Node.js 环境
-      # 建议使用 Node 18，因为你的 build.js 里 target 是 node18-win-x64
+      # 2. [核心步骤] 从 CHANGELOG.md 中提取当前版本的说明
+      - name: Get notes from Changelog
+        id: generate_notes
+        uses: anmarkoulis/commitizen-changelog-reader@master
+        with:
+          tag_name: ${{ github.ref }}
+          changelog: CHANGELOG.md
+
+      # 3. 设置 Node 环境并构建项目
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'npm'
 
-      # 3. 安装依赖
-      # CI 环境推荐使用 npm ci，它比 npm install 更快且更严格
-      - name: Install dependencies
-        run: npm ci
-
-      # 4. 执行构建脚本
-      # 这里会执行 node build.js
-      - name: Build the app
-        run: npm run build
+      - name: Install and Build
+        run: |
+          npm ci
+          npm run build
         env:
-          # 告诉 build.js 这是 CI 环境，不要使用 ghproxy 镜像
-          # 配合我上一条回答中建议修改的 build.js 逻辑使用
-          CI: true 
+          CI: true
 
-      # 5. 检查生成的产物 (调试用，确认 dist 目录里有文件)
-      - name: List build artifacts
-        run: dir dist
-
-      # 6. 自动创建 GitHub Release 并上传 .exe
+      # 4. 发布 Release
       - name: Create Release & Upload .exe
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
         with:
-          body_path: RELEASE_NOTES.md
-          
-          # 上传 dist 目录下的 exe 文件
+          tag_name: ${{ github.ref_name }}
+          name: Android Remote CLI ${{ github.ref_name }}
+          # 【关键点】该插件返回的是 JSON 格式，需要用 join 函数转回字符串
+          body: ${{ join(fromJson(steps.generate_notes.outputs.notes).notes, '') }}
           files: |
             dist/*.exe
-            
           draft: false
           prerelease: false
