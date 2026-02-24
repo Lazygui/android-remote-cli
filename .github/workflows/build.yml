@@ -3,7 +3,7 @@ name: Build and Release Android Remote (Windows)
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*' # 当推送 v 开头的标签时触发，如 v1.0.0
 
 permissions:
   contents: write
@@ -18,9 +18,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # 获取完整历史以确保能读取到所有内容
 
-      # 2. [核心替代步骤] 使用 Node.js 脚本提取 Changelog 内容
+      # 2. 提取 Release Notes (增强版脚本)
+      # 该脚本会自动去 CHANGELOG.md 中匹配当前 Tag 的内容，忽略日期后缀
       - name: Extract Release Notes
         id: extract_notes
         uses: actions/github-script@v7
@@ -35,43 +36,55 @@ jobs:
             const changelog = fs.readFileSync(path, 'utf8');
             const tag = context.ref.replace('refs/tags/', '');
             
-            // 匹配 ## v1.0.0 或 ## [v1.0.0] 及其之后的内容，直到下一个 ## 或文件结束
-            // 这个正则兼容性很强，能自动识别你的版本号段落
-            const regex = new RegExp(`## \\[?${tag.replace('.', '\\.')}\\]?[\\s\\S]*?(?=\\n## |\\z)`);
+            // 转义标签中的点，防止正则误判
+            const escapedTag = tag.replace(/\./g, '\\.');
+            
+            // 正则说明：
+            // ## .*?v1\.0\.0.*? 匹配包含版本号的二级标题行（支持后面跟日期）
+            // ([\s\S]*?) 抓取随后的内容
+            // (?=\r?\n## |\z) 在遇到下一个二级标题或文件结束时停止
+            const regex = new RegExp(`## .*?${escapedTag}.*?(\\r?\\n)([\\s\\S]*?)(?=\\r?\\n## |\\z)`, 'i');
             const result = changelog.match(regex);
             
-            if (result) {
-              // 提取内容并去掉第一行的标题
-              const lines = result[0].split('\n');
-              const notes = lines.slice(1).join('\n').trim();
+            if (result && result[2]) {
+              const notes = result[2].trim();
+              console.log('✅ 成功提取更新日志：\n', notes);
               core.setOutput('notes', notes);
             } else {
-              core.setOutput('notes', `Release notes for ${tag} not found in CHANGELOG.md`);
+              console.log('❌ 正则匹配失败，标签：', tag);
+              core.setOutput('notes', `Release notes for ${tag} not found in CHANGELOG.md. Please ensure the header format is "## ${tag}".`);
             }
 
-      # 3. 设置 Node 环境并构建
+      # 3. 设置 Node.js 环境
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'npm'
 
+      # 4. 安装依赖并执行构建脚本
       - name: Install and Build
         run: |
           npm ci
           npm run build
         env:
-          CI: true
+          # CI 环境变量会告知 build.js 使用官方下载源，不走国内镜像
+          CI: true 
 
-      # 4. 发布 Release
+      # 5. 检查构建产物
+      - name: Check artifacts
+        run: dir dist
+
+      # 6. 发布 Release 到 GitHub
       - name: Create Release & Upload .exe
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Android Remote CLI ${{ github.ref_name }}
-          # 使用上面脚本提取出的内容
+          # 动态填入从 CHANGELOG.md 中提取的内容
           body: ${{ steps.extract_notes.outputs.notes }}
           files: |
             dist/*.exe
           draft: false
           prerelease: false
+          generate_release_notes: false # 设为 false，因为我们已经自己提供了 body
