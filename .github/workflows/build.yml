@@ -94,7 +94,8 @@ jobs:
           npm ci
           npm run build
         env:
-          CI: true 
+          PKG_CACHE_PATH: ${{ github.workspace }}/.pkg-cache # 显式指定环境变量
+          CI: true
 
       # 5. 发布 Release
       - name: Create Release & Upload .exe
