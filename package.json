@@ -6,7 +6,9 @@
   "bin": "index.js",
   "scripts": {
     "start": "node index.js",
-    "build": "node build.js"
+    "build": "node build.js",
+    "pkg-build": "pkg . --output dist/android-remote-tool.exe",
+    "pkg-build-win": "pkg . --icon app.ico --output dist/android-remote-tool.exe"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +21,7 @@
   },
   "devDependencies": {
     "pkg": "^5.8.1",
+    "rcedit": "^5.0.2",
     "resedit": "^3.0.2"
   },
   "pkg": {
