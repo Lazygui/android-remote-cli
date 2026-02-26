@@ -6,9 +6,7 @@
   "bin": "index.js",
   "scripts": {
     "start": "node index.js",
-    "build": "node build.js",
-    "pkg-build": "pkg . --output dist/android-remote-tool.exe",
-    "pkg-build-win": "pkg . --icon app.ico --output dist/android-remote-tool.exe"
+    "build": "node build.js"
   },
   "keywords": [],
   "author": "",
