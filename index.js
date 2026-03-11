@@ -9,7 +9,7 @@ const axios = require('axios');
 // 配置常量
 const APP_DIR = path.join(os.homedir(), '.android-remote-cli');
 const CONFIG_FILE = path.join(APP_DIR, 'config.json');
-const SCRCPY_VERSION = 'v3.3.1';
+const SCRCPY_VERSION = 'v3.3.4';
 const SCRCPY_FILENAME = `scrcpy-win64-${SCRCPY_VERSION}`;
 const DOWNLOAD_URL = `https://github.com/Genymobile/scrcpy/releases/download/${SCRCPY_VERSION}/${SCRCPY_FILENAME}.zip`;
 
