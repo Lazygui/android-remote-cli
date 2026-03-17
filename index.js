@@ -138,7 +138,9 @@ async function mainMenu() {
               type: 'list',
               name: 'main',
               message: '请选择操作:',
-              choices: choices
+              choices: choices,
+              pageSize: 20,
+              loop: false
        }]);
 
        switch (answer.main.action) {
